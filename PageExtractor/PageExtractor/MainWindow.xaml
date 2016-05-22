@@ -1,0 +1,51 @@
+﻿<Window
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="d" x:Class="PageExtractor.MainWindow"
+        Title="Contents Spider" Height="700" Width="900">
+    <Grid Margin="20,10">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="120"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="40"/>
+        </Grid.RowDefinitions>
+        <Border Grid.Row="0" BorderThickness="2" BorderBrush="BurlyWood" Margin="30,10,30,40" Padding="10">
+            <Grid>
+                <Grid.Resources>
+                    <Style TargetType="{x:Type TextBlock}">
+                        <Setter Property="Margin" Value="10,5"/>
+                    </Style>
+                    <Style TargetType="{x:Type TextBox}">
+                        <Setter Property="Margin" Value="10,5"/>
+                    </Style>
+                </Grid.Resources>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="70"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="40"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Text="Base Url" Grid.Row="0" Grid.Column="0" TextAlignment="Center"/>
+                <TextBox x:Name="TextUrl" Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2" FontSize="14" IsEnabled="False" TextAlignment="Center"/>
+            </Grid>
+        </Border>
+        <ListView x:Name="ListDownload" Margin="5,101,5,20" Padding="5" Grid.RowSpan="2">
+            <ListView.View>
+                <GridView>
+                    <GridViewColumn Header="Download Url" DisplayMemberBinding="{Binding Url}" Width="600"/>
+                    <GridViewColumn Header="HttpStatus" DisplayMemberBinding="{Binding Status}" Width="260"/>
+                </GridView>
+            </ListView.View>
+        </ListView>
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition/>
+                <ColumnDefinition/>
+            </Grid.ColumnDefinitions>
+            <Button x:Name="btnDownload" Content="Download" Click="btnDownload_Click" Grid.Column="0" Margin="30,3"/>
+            <Button x:Name="btnStop" Content="Stop" Click="btnStop_Click" Grid.Column="1" Margin="30,3"/>
+        </Grid>
+    </Grid>
+</Window>
