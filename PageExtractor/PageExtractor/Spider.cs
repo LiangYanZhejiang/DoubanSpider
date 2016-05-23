@@ -11,6 +11,7 @@ using System.Windows.Threading;
 using System.Threading;
 using System.Xml;
 using Sgml;
+using NLog;
 
 namespace PageExtractor
 {
@@ -69,6 +70,7 @@ namespace PageExtractor
     }
     class Spider
     {
+        NLog.Logger _log = NLog.LogManager.GetCurrentClassLogger();
         #region private type
         private class RequestState
         {
@@ -337,6 +339,7 @@ namespace PageExtractor
         #region private methods
         private void StartDownload()
         {
+            _log.Debug("StartDownload");
             _checkTimer = new Timer(new TimerCallback(CheckFinish), null, 0, 300);
             DispatchWork();
         }
@@ -375,6 +378,7 @@ namespace PageExtractor
             _urlsLoaded.Clear();
             _urlsUnload.Clear();
             _dbm.Init_loaddb(_urlsLoaded, _urlsUnload);
+            _log.Debug("Init: _urlsLoaded.Count = {0}, _urlsUnload.Count = {1}.", _urlsLoaded.Count, _urlsUnload.Count);
             _index = 0;
             _reqsBusy = new bool[_reqCount];
             _workingSignals = new WorkingUnitCollection(_reqCount);
@@ -413,6 +417,8 @@ namespace PageExtractor
             }
             catch (WebException we)
             {
+                _log.Error("RequestResource: url={0}，HttpStatus={1}, Exception:{2}.", url, we.Status, we.Message);
+                _log.Trace(we.StackTrace); 
                 UrlInfo urlInfo = new UrlInfo(url, we.Status.ToString());
                 _dbm.write_to_db(urlInfo);
             }
@@ -437,10 +443,7 @@ namespace PageExtractor
                     Stream resStream = res.GetResponseStream();
                     rs.ResStream = resStream;
                     var result = resStream.BeginRead(rs.Data, 0, rs.BufferSize,
-                        new AsyncCallback(ReceivedData), rs);
-
-                    UrlInfo urlInfo = new UrlInfo(url, HttpStatusCode.OK.ToString());
-                    _dbm.write_to_db(urlInfo);
+                        new AsyncCallback(ReceivedData), rs);                    
                 }
                 else
                 {
@@ -452,12 +455,16 @@ namespace PageExtractor
             }
             catch (WebException we)
             {
+                _log.Error("ReceivedResource: url = {0}, HttpStatus = {1}, Exception:{2}.", url, we.Status, we.Message);
+                _log.Trace(we.StackTrace); 
                 UrlInfo urlInfo = new UrlInfo(url, we.Status.ToString());
                 _dbm.write_to_db(urlInfo);
             }
             catch (Exception e)
             {
-                MessageBox.Show(e.Message);
+                _log.Error("ReceivedResource: url = {0}, Exception:{1}.", url, e.Message);
+                _log.Trace(e.StackTrace);
+                //MessageBox.Show(e.Message);
             }
         }
 
@@ -513,12 +520,16 @@ namespace PageExtractor
             }
             catch (WebException we)
             {
+                _log.Error("ReceivedData: url = {0}, HttpStatus = {1}, Exception:{2}.", url, we.Status, we.Message);
+                _log.Trace(we.StackTrace); 
                 UrlInfo urlInfo = new UrlInfo(url, we.Status.ToString());
                 _dbm.write_to_db(urlInfo);
             }
             catch (Exception e)
             {
-                MessageBox.Show(e.GetType().ToString() + e.Message);
+                _log.Error("ReceivedData: url = {0}, Exception:{1}.", url, e.Message);
+                _log.Trace(e.StackTrace);
+                //MessageBox.Show(e.GetType().ToString() + e.Message);
             }
         }
 
@@ -611,6 +622,9 @@ namespace PageExtractor
             {
                 ContentsSaved(HttpStatusCode.OK.ToString(), url);
             }
+
+            UrlInfo urlInfo = new UrlInfo(url, HttpStatusCode.OK.ToString());
+            _dbm.write_to_db(urlInfo);
         }
 
         private void paserDate(string xml, string url, UrlType urlType)
@@ -967,6 +981,7 @@ namespace PageExtractor
                 }
                 else
                 {
+                    _log.Debug("Try add url failed:{0}.", cleanUrl);
                     //do nothing
                 }
             }

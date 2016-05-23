@@ -7,7 +7,7 @@ namespace PageExtractor
 {
     internal sealed class cmd_opts
     {
-        public const int __cache_default = 200;
+        public const int __cache_default = 3;
 
         public static string _db_path = "PageExtractor.db3";
         //[Option("c", "dbcache", HelpText = "数据文件写入缓存(n).  [default: 500]")]
@@ -247,22 +247,16 @@ namespace PageExtractor
                 {
                     foreach (UrlInfo cache in _updateUrl_cache)
                     {
-                        if (_LoadedWebUrl.Contains(cache._WebUrl))
-                        {
-                            _updateUrl_cache.Add(cache);
-                            continue;
-                        }
-
                         SQLiteCommand cmd = new SQLiteCommand(conn);
                         cmd.Transaction = tran;
-                        cmd.CommandText = @"update UrlInfo set HttpStatus = @HttpStatus, UpdateTime = @UpdateTime
-                                            LatestReqTime = @LatestReqTime where WebUrl = @WebUrl)";
+                        cmd.CommandText = @"update UrlInfo set HttpStatus = @HttpStatus, UpdateTime = @UpdateTime,
+                                            LatestReqTime = @LatestReqTime where WebUrl = @WebUrl;";
 
                         cmd.Parameters.AddRange(new[] {
-								new SQLiteParameter("@WebUrl", cache._WebUrl),
                                 new SQLiteParameter("@HttpStatus", cache._HttpStatus),
                                 new SQLiteParameter("@UpdateTime", cache._updateTime),
-                                new SQLiteParameter("@LatestReqTime", _latestRoundTime)
+                                new SQLiteParameter("@LatestReqTime", _latestRoundTime),
+                                new SQLiteParameter("@WebUrl", cache._WebUrl)
 							});
                         cmd.ExecuteNonQuery();
 
@@ -294,11 +288,11 @@ namespace PageExtractor
                                           [ISBN] NVARCHAR(50),
                                           [AverageScore] float,
                                           [RatingNum] nchar(10),
-                                          [FiveStar] float,
-                                          [FourStar] float,
-                                          [ThreeStar] float,
-                                          [TwoStar] float,
-                                          [OneStar] float,
+                                          [FiveStar] DECIMAL(10,4),
+                                          [FourStar] DECIMAL(10,4),
+                                          [ThreeStar] DECIMAL(10,4),
+                                          [TwoStar] DECIMAL(10,4),
+                                          [OneStar] DECIMAL(10,4),
                                           [ContentDescription] NVARCHAR(5000),
                                           [AuthorDescription] NVARCHAR(5000),
                                           [Tags] NVARCHAR(50));";

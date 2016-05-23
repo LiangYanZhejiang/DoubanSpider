@@ -39,8 +39,11 @@
     <Reference Include="HtmlAgilityPack">
       <HintPath>Properties\HtmlAgilityPack.dll</HintPath>
     </Reference>
+    <Reference Include="NLog">
+      <HintPath>.\NLog.dll</HintPath>
+    </Reference>
     <Reference Include="SgmlReaderDll">
-      <HintPath>..\..\SGMLReader-master\sgmlreaderdll\bin\Debug\SgmlReaderDll.dll</HintPath>
+      <HintPath>.\SgmlReaderDll.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Data" />
