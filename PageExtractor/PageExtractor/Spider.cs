@@ -35,12 +35,12 @@ namespace PageExtractor
         public string _Translator;
         public string _Publish;
         public string _PublishTime;
-        public int _PageNum;
+        public string _PageNum;
         public string _Price;
         public string _ISBN;
-        public float _AverageScore;
+        public decimal _AverageScore;
         public int _RatingNum;
-        public float[] _star = new float[StarMax];
+        public decimal[] _star = new decimal[StarMax];
         public string _Content;
         public string _AuthorDesc;
         public string _tags;
@@ -191,7 +191,6 @@ namespace PageExtractor
         private Encodings _enc = Encodings.GB;
         private int _maxTime = 2 * 60 * 1000;
 
-        private int _index;
         private string _rootUrl = null;
         private string _baseUrl = null;
         private Dictionary<string, UrlType> _urlsLoaded = new Dictionary<string, UrlType>();
@@ -285,7 +284,7 @@ namespace PageExtractor
         #region public type
         public delegate void ContentsSavedHandler(string path, string url);
 
-        public delegate void DownloadFinishHandler(int count);
+        public delegate void DownloadFinishHandler();
 
         public enum Encodings
         {
@@ -352,7 +351,7 @@ namespace PageExtractor
                 _checkTimer = null;
                 if (DownloadFinish != null)
                 {
-                    DownloadFinish(_index);
+                    DownloadFinish();
                 }
             }
         }
@@ -379,7 +378,6 @@ namespace PageExtractor
             _urlsUnload.Clear();
             _dbm.Init_loaddb(_urlsLoaded, _urlsUnload);
             _log.Debug("Init: _urlsLoaded.Count = {0}, _urlsUnload.Count = {1}.", _urlsLoaded.Count, _urlsUnload.Count);
-            _index = 0;
             _reqsBusy = new bool[_reqCount];
             _workingSignals = new WorkingUnitCollection(_reqCount);
             _stop = false;
@@ -405,7 +403,9 @@ namespace PageExtractor
                     _urlsLoaded.Add(url, urltype);
                     _urlsUnload.Remove(url);
                 }
-                
+
+                _log.Info("Request {0} Time:{1}.", url, DateTime.Now.ToString()); 
+
                 HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
                 req.Method = _method; //请求方法
                 req.Accept = _accept; //接受的内容
@@ -418,7 +418,7 @@ namespace PageExtractor
             catch (WebException we)
             {
                 _log.Error("RequestResource: url={0}，HttpStatus={1}, Exception:{2}.", url, we.Status, we.Message);
-                _log.Trace(we.StackTrace); 
+                _log.Error(we.StackTrace); 
                 UrlInfo urlInfo = new UrlInfo(url, we.Status.ToString());
                 _dbm.write_to_db(urlInfo);
             }
@@ -456,14 +456,19 @@ namespace PageExtractor
             catch (WebException we)
             {
                 _log.Error("ReceivedResource: url = {0}, HttpStatus = {1}, Exception:{2}.", url, we.Status, we.Message);
-                _log.Trace(we.StackTrace); 
+                _log.Error(we.StackTrace); 
                 UrlInfo urlInfo = new UrlInfo(url, we.Status.ToString());
                 _dbm.write_to_db(urlInfo);
+
+                if (ContentsSaved != null)
+                {
+                    ContentsSaved(we.Status.ToString(), url);
+                }
             }
             catch (Exception e)
             {
                 _log.Error("ReceivedResource: url = {0}, Exception:{1}.", url, e.Message);
-                _log.Trace(e.StackTrace);
+                _log.Error(e.StackTrace);
                 //MessageBox.Show(e.Message);
             }
         }
@@ -515,20 +520,35 @@ namespace PageExtractor
 
                 SaveContents(sw.ToString(), url, urltype);
 
+                if (ContentsSaved != null)
+                {
+                    ContentsSaved(WebExceptionStatus.Success.ToString(), url);
+                }
+
                 _reqsBusy[index] = false;
                 DispatchWork();
             }
             catch (WebException we)
             {
                 _log.Error("ReceivedData: url = {0}, HttpStatus = {1}, Exception:{2}.", url, we.Status, we.Message);
-                _log.Trace(we.StackTrace); 
+                _log.Error(we.StackTrace); 
                 UrlInfo urlInfo = new UrlInfo(url, we.Status.ToString());
                 _dbm.write_to_db(urlInfo);
+
+                if (ContentsSaved != null)
+                {
+                    ContentsSaved(we.Status.ToString(), url);
+                }
             }
             catch (Exception e)
             {
                 _log.Error("ReceivedData: url = {0}, Exception:{1}.", url, e.Message);
-                _log.Trace(e.StackTrace);
+                _log.Error(e.StackTrace);
+
+                if (ContentsSaved != null)
+                {
+                    ContentsSaved(e.Message, url);
+                }
                 //MessageBox.Show(e.GetType().ToString() + e.Message);
             }
         }
@@ -609,19 +629,7 @@ namespace PageExtractor
                 return;
             }
 
-            try
-            {
-                paserDate(xml, url, urltype);
-            }
-            catch (Exception e)
-            {
-                ContentsSaved(e.Message, url);
-            }
-
-            if (ContentsSaved != null)
-            {
-                ContentsSaved(HttpStatusCode.OK.ToString(), url);
-            }
+            paserDate(xml, url, urltype);            
 
             UrlInfo urlInfo = new UrlInfo(url, HttpStatusCode.OK.ToString());
             _dbm.write_to_db(urlInfo);
@@ -774,7 +782,7 @@ namespace PageExtractor
 
                 if (isPageNum)
                 {
-                    bookInfo._PageNum = Convert.ToInt32(childnode.InnerText);
+                    bookInfo._PageNum = childnode.InnerText;
                     isPageNum = false;
                 }
 
@@ -810,9 +818,8 @@ namespace PageExtractor
             if (nodeList.Count < 1)
                 return;
 
-            if (!float.TryParse(nodeList[0].InnerText, out bookInfo._AverageScore))
-                return;
-                
+            if (!decimal.TryParse(nodeList[0].InnerText, out bookInfo._AverageScore))
+                return;                
   
             nodeList = root.SelectNodes("//span[@property='v:votes']");
             if (nodeList.Count < 1)
@@ -828,9 +835,10 @@ namespace PageExtractor
                     break;
 
                 string star = StarNode.InnerText.TrimEnd('%');
-                float fstar;
-                if (float.TryParse(star, out fstar))
-                    bookInfo._star[starNum] = fstar / 100f;
+
+                decimal dStar;
+                if (decimal.TryParse(star, out dStar))
+                  bookInfo._star[starNum] = dStar / 100;
                 starNum++;
             }
                 

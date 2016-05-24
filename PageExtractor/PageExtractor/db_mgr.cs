@@ -7,7 +7,7 @@ namespace PageExtractor
 {
     internal sealed class cmd_opts
     {
-        public const int __cache_default = 3;
+        public const int __cache_default = 200;
 
         public static string _db_path = "PageExtractor.db3";
         //[Option("c", "dbcache", HelpText = "数据文件写入缓存(n).  [default: 500]")]
@@ -283,10 +283,10 @@ namespace PageExtractor
                                           [Author] NVARCHAR(200),
                                           [Publisher] NVARCHAR(200), 
                                           [PublishDate] NVARCHAR(50),
-                                          [PageNum] int,
+                                          [PageNum] NVARCHAR(50),
                                           [Price] NVARCHAR(50),
                                           [ISBN] NVARCHAR(50),
-                                          [AverageScore] float,
+                                          [AverageScore] DECIMAL(10,4),
                                           [RatingNum] nchar(10),
                                           [FiveStar] DECIMAL(10,4),
                                           [FourStar] DECIMAL(10,4),
@@ -375,7 +375,8 @@ namespace PageExtractor
                 if (latestRoundCount == WebUrlTotalCount)
                 {
                     _latestRoundTime = DateTime.Now;
-                    cmd.CommandText = @"SELECT WebUrl FROM UrlInfo Where UrlType = 0;";
+                    cmd.CommandText = @"SELECT WebUrl FROM UrlInfo Where UrlType = @UrlType;";
+                    cmd.Parameters.AddRange(new[] { new SQLiteParameter("@UrlType", UrlType.TagsUrl.ToString()) });
                     reader = cmd.ExecuteReader();
                     while (reader.Read())
                     {

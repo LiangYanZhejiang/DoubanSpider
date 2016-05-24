@@ -22,7 +22,7 @@ namespace PageExtractor
     {
         private Spider _spider = null;
         private delegate void CSHandler(string arg0, string arg1);
-        private delegate void DFHandler(int arg1);
+        private delegate void DFHandler();
 
         public MainWindow()
         {
@@ -40,17 +40,17 @@ namespace PageExtractor
             TextUrl.Text = "book.douban.com";
         }
         
-        void Spider_DownloadFinish(int count)
+        void Spider_DownloadFinish()
         {
-            DFHandler h = c =>
+            DFHandler h = () =>
             {
                 _spider.Abort();
                 btnDownload.IsEnabled = true;
                 btnDownload.Content = "Download";
                 btnStop.IsEnabled = false;
-                MessageBox.Show("Finished " + c.ToString());
+                MessageBox.Show("Finished.");
             };
-            Dispatcher.Invoke(h, count);
+            Dispatcher.Invoke(h);
         }
 
         void MainWindow_Closed(object sender, EventArgs e)
