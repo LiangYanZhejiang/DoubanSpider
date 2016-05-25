@@ -176,7 +176,7 @@ namespace PageExtractor
 
                         cmd.Parameters.AddRange(new[] {
 								new SQLiteParameter("@WebUrl", cache._WebUrl),
-                                new SQLiteParameter("@UrlType", cache._UrlType),
+                                new SQLiteParameter("@UrlType", cache._UrlType.ToString()),
                                 new SQLiteParameter("@HttpStatus", cache._HttpStatus),
                                 new SQLiteParameter("@CreateTime", cache._creatTime)
 							});
@@ -389,7 +389,7 @@ namespace PageExtractor
                     cmd.CommandText = @"SELECT WebUrl, UrlType FROM UrlInfo Where LatestReqTime <> @LatestReqTime or HttpStatus <> @HttpStatus or latestreqtime is null or httpstatus is null;";
                     cmd.Parameters.AddRange(new[] {
                                 new SQLiteParameter("@LatestReqTime", _latestRoundTime),
-                                new SQLiteParameter("@HttpStatus", System.Net.HttpStatusCode.OK.ToString())});
+                                new SQLiteParameter("@HttpStatus", System.Net.WebExceptionStatus.Success.ToString())});
                     reader = cmd.ExecuteReader();
                     while (reader.Read())
                     {
@@ -400,7 +400,7 @@ namespace PageExtractor
                     cmd.CommandText = @"SELECT WebUrl, UrlType FROM UrlInfo Where LatestReqTime = @LatestReqTime and HttpStatus = @HttpStatus;";
                     cmd.Parameters.AddRange(new[] {
                                 new SQLiteParameter("@LatestReqTime", _latestRoundTime),
-                                new SQLiteParameter("@HttpStatus", System.Net.HttpStatusCode.OK.ToString()) });
+                                new SQLiteParameter("@HttpStatus", System.Net.WebExceptionStatus.Success.ToString()) });
                     reader = cmd.ExecuteReader();
                     while (reader.Read())
                     {

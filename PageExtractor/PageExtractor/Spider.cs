@@ -51,10 +51,10 @@ namespace PageExtractor
         public string _WebUrl;
         public DateTime _creatTime;
         public DateTime _updateTime;
-        public int _UrlType;
+        public UrlType _UrlType;
         public string _HttpStatus;
 
-        public UrlInfo(string webUrl, int urlType)
+        public UrlInfo(string webUrl, UrlType urlType)
         {
             _WebUrl = webUrl;
             _UrlType = urlType;
@@ -201,7 +201,7 @@ namespace PageExtractor
         private Timer _checkTimer = null;
         private readonly object _locker = new object();
         private bool[] _reqsBusy = null;
-        private int _reqCount = 4;
+        private int _reqCount = 10;
         private WorkingUnitCollection _workingSignals;
         #endregion
 
@@ -358,15 +358,12 @@ namespace PageExtractor
 
         private void DispatchWork()
         {
-            if (_stop)
-            {
-                return;
-            }
             for (int i = 0; i < _reqCount; i++)
             {
                 if (!_reqsBusy[i])
                 {
                     RequestResource(i);
+                    Thread.Sleep(100);
                 }
             }
         }
@@ -385,12 +382,20 @@ namespace PageExtractor
 
         private void RequestResource(int index)
         {
+            if (_stop)
+            {
+                return;
+            }
+
             UrlType urltype;
             string url = "";
             try
             {
                 lock (_locker)
                 {
+                    if (_reqsBusy[index])
+                        return;
+
                     if (_urlsUnload.Count <= 0)
                     {
                         _workingSignals.FinishWorking(index);
@@ -418,10 +423,16 @@ namespace PageExtractor
             catch (WebException we)
             {
                 _log.Error("RequestResource: url={0}，HttpStatus={1}, Exception:{2}.", url, we.Status, we.Message);
-                _log.Error(we.StackTrace); 
+                _log.Error(we.StackTrace);
+ 
                 UrlInfo urlInfo = new UrlInfo(url, we.Status.ToString());
                 _dbm.write_to_db(urlInfo);
+
+                _reqsBusy[index] = false;
             }
+
+            if (!_reqsBusy[index])
+                RequestResource(index);
         }
 
         private void ReceivedResource(IAsyncResult ar)
@@ -450,7 +461,6 @@ namespace PageExtractor
                     res.Close();
                     rs.Req.Abort();
                     _reqsBusy[rs.Index] = false;
-                    DispatchWork();
                 }
             }
             catch (WebException we)
@@ -464,13 +474,27 @@ namespace PageExtractor
                 {
                     ContentsSaved(we.Status.ToString(), url);
                 }
+
+                _reqsBusy[rs.Index] = false;
             }
             catch (Exception e)
             {
                 _log.Error("ReceivedResource: url = {0}, Exception:{1}.", url, e.Message);
                 _log.Error(e.StackTrace);
-                //MessageBox.Show(e.Message);
+
+                UrlInfo urlInfo = new UrlInfo(url, e.Message);
+                _dbm.write_to_db(urlInfo);
+
+                if (ContentsSaved != null)
+                {
+                    ContentsSaved(e.Message, url);
+                }
+
+                _reqsBusy[rs.Index] = false;
             }
+
+            if (!_reqsBusy[rs.Index])
+                RequestResource(rs.Index);
         }
 
         private void ReceivedData(IAsyncResult ar)
@@ -483,6 +507,7 @@ namespace PageExtractor
             string html = null;
             int index = rs.Index;
             int read = 0;
+            string HttpStatus;
 
             try
             {
@@ -519,38 +544,33 @@ namespace PageExtractor
                 }
 
                 SaveContents(sw.ToString(), url, urltype);
-
-                if (ContentsSaved != null)
-                {
-                    ContentsSaved(WebExceptionStatus.Success.ToString(), url);
-                }
-
-                _reqsBusy[index] = false;
-                DispatchWork();
+                HttpStatus = WebExceptionStatus.Success.ToString();                 
             }
             catch (WebException we)
             {
                 _log.Error("ReceivedData: url = {0}, HttpStatus = {1}, Exception:{2}.", url, we.Status, we.Message);
                 _log.Error(we.StackTrace); 
-                UrlInfo urlInfo = new UrlInfo(url, we.Status.ToString());
-                _dbm.write_to_db(urlInfo);
 
-                if (ContentsSaved != null)
-                {
-                    ContentsSaved(we.Status.ToString(), url);
-                }
+                HttpStatus = we.Status.ToString();
             }
             catch (Exception e)
             {
                 _log.Error("ReceivedData: url = {0}, Exception:{1}.", url, e.Message);
                 _log.Error(e.StackTrace);
 
-                if (ContentsSaved != null)
-                {
-                    ContentsSaved(e.Message, url);
-                }
-                //MessageBox.Show(e.GetType().ToString() + e.Message);
+                HttpStatus = e.Message;                
             }
+
+            UrlInfo urlInfo = new UrlInfo(url, HttpStatus);
+            _dbm.write_to_db(urlInfo);
+
+            if (ContentsSaved != null)
+            {
+                ContentsSaved(HttpStatus, url);
+            }
+
+            _reqsBusy[index] = false;
+            RequestResource(index);
         }
 
         string RemoveTab(string html, string tab)
@@ -629,10 +649,7 @@ namespace PageExtractor
                 return;
             }
 
-            paserDate(xml, url, urltype);            
-
-            UrlInfo urlInfo = new UrlInfo(url, HttpStatusCode.OK.ToString());
-            _dbm.write_to_db(urlInfo);
+            paserDate(xml, url, urltype);
         }
 
         private void paserDate(string xml, string url, UrlType urlType)
@@ -921,9 +938,16 @@ namespace PageExtractor
                 if (rs != null)
                 {
                     rs.Req.Abort();
+
+                    _log.Error("TimeoutCallback: url={0}，HttpStatus={1}.", rs.Url, "Timeout");
+
+                    UrlInfo urlInfo = new UrlInfo(rs.Url, "TimeoutCallback:TimeOut");
+                    _dbm.write_to_db(urlInfo);
+
+                    _reqsBusy[rs.Index] = false;
+                    RequestResource(rs.Index);
                 }
-                _reqsBusy[rs.Index] = false;
-                DispatchWork();
+                
             }
         }
 
@@ -984,7 +1008,7 @@ namespace PageExtractor
                 if (cleanUrl.Contains("book.douban.com/tag") || cleanUrl.Contains("book.douban.com/subject"))
                 {
                     _urlsUnload.Add(cleanUrl, urlType);
-                    UrlInfo urlInfo = new UrlInfo(cleanUrl, (int)urlType);
+                    UrlInfo urlInfo = new UrlInfo(cleanUrl, urlType);
                     _dbm.write_to_db(urlInfo);
                 }
                 else
