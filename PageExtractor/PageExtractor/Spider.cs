@@ -195,13 +195,15 @@ namespace PageExtractor
         private string _baseUrl = null;
         private Dictionary<string, UrlType> _urlsLoaded = new Dictionary<string, UrlType>();
         private Dictionary<string, UrlType> _urlsUnload = new Dictionary<string, UrlType>();
+        /*bool url, need load first*/
+        private Dictionary<string, UrlType> _urlsUnload2 = new Dictionary<string, UrlType>();
         private static db_mgr _dbm;
 
         private bool _stop = true;
         private Timer _checkTimer = null;
         private readonly object _locker = new object();
         private bool[] _reqsBusy = null;
-        private int _reqCount = 10;
+        private int _reqCount = 4;
         private WorkingUnitCollection _workingSignals;
         #endregion
 
@@ -373,8 +375,10 @@ namespace PageExtractor
             _dbm = new db_mgr(cmd_opts._db_path, cmd_opts._db_cache);
             _urlsLoaded.Clear();
             _urlsUnload.Clear();
-            _dbm.Init_loaddb(_urlsLoaded, _urlsUnload);
-            _log.Debug("Init: _urlsLoaded.Count = {0}, _urlsUnload.Count = {1}.", _urlsLoaded.Count, _urlsUnload.Count);
+            _urlsUnload2.Clear();
+            _dbm.Init_loaddb(_urlsLoaded, _urlsUnload, _urlsUnload2);
+            _log.Debug("Init: _urlsLoaded.Count = {0}, tagunload.Count = {1}, book unload.Count = {2}.",
+                       _urlsLoaded.Count, _urlsUnload.Count, _urlsUnload2.Count);
             _reqsBusy = new bool[_reqCount];
             _workingSignals = new WorkingUnitCollection(_reqCount);
             _stop = false;
@@ -396,17 +400,27 @@ namespace PageExtractor
                     if (_reqsBusy[index])
                         return;
 
-                    if (_urlsUnload.Count <= 0)
+                    if (_urlsUnload2.Count <= 0 && _urlsUnload.Count <= 0)
                     {
                         _workingSignals.FinishWorking(index);
                         return;
                     }
                     _reqsBusy[index] = true;
                     _workingSignals.StartWorking(index);
-                    urltype = _urlsUnload.First().Value;
-                    url = _urlsUnload.First().Key;
+                    if (_urlsUnload2.Count > 0)
+                    {
+                        urltype = _urlsUnload2.First().Value;
+                        url = _urlsUnload2.First().Key;
+                        _urlsUnload2.Remove(url);
+                    }
+                    else
+                    {
+                        urltype = _urlsUnload.First().Value;
+                        url = _urlsUnload.First().Key;
+                        _urlsUnload.Remove(url);
+                    }
                     _urlsLoaded.Add(url, urltype);
-                    _urlsUnload.Remove(url);
+                    
                 }
 
                 _log.Info("Request {0} Time:{1}.", url, DateTime.Now.ToString()); 
@@ -968,6 +982,7 @@ namespace PageExtractor
         private bool UrlExists(string url)
         {
             bool result = _urlsUnload.ContainsKey(url);
+            result |= _urlsUnload2.ContainsKey(url);
             result |= _urlsLoaded.ContainsKey(url);
             return result;
         }
@@ -1007,7 +1022,10 @@ namespace PageExtractor
             {
                 if (cleanUrl.Contains("book.douban.com/tag") || cleanUrl.Contains("book.douban.com/subject"))
                 {
-                    _urlsUnload.Add(cleanUrl, urlType);
+                    if (urlType == UrlType.OneBookUrl)
+                        _urlsUnload2.Add(cleanUrl, urlType);
+                    else
+                        _urlsUnload.Add(cleanUrl, urlType);
                     UrlInfo urlInfo = new UrlInfo(cleanUrl, urlType);
                     _dbm.write_to_db(urlInfo);
                 }

@@ -321,7 +321,9 @@ namespace PageExtractor
                 conn.Close();
             }
         }
-        public void Init_loaddb(Dictionary<string, UrlType> urlsLoaded, Dictionary<string, UrlType> urlsUnload)
+        public void Init_loaddb(Dictionary<string, UrlType> urlsLoaded, 
+                                Dictionary<string, UrlType> urlsUnload,
+                                Dictionary<string, UrlType> urlsUnload2)
         {
             if (!_db_created)
             {                
@@ -380,7 +382,7 @@ namespace PageExtractor
                     reader = cmd.ExecuteReader();
                     while (reader.Read())
                     {
-                        urlsUnload.Add(reader.GetString(0), 0);
+                        urlsUnload.Add(reader.GetString(0), UrlType.TagsUrl);
                     }
                     reader.Close();
                 }
@@ -393,7 +395,11 @@ namespace PageExtractor
                     reader = cmd.ExecuteReader();
                     while (reader.Read())
                     {
-                         urlsUnload.Add(reader.GetString(0), (UrlType)Enum.Parse(typeof(UrlType), reader.GetString(1)));
+                        UrlType urlType = (UrlType)Enum.Parse(typeof(UrlType), reader.GetString(1));
+                        if (urlType == UrlType.OneBookUrl)
+                            urlsUnload2.Add(reader.GetString(0), urlType);
+                        else
+                            urlsUnload.Add(reader.GetString(0), urlType);
                     }
                     reader.Close();
 
