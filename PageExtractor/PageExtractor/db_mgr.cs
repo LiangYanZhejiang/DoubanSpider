@@ -115,17 +115,18 @@ namespace PageExtractor
 
                         SQLiteCommand cmd = new SQLiteCommand(conn);
                         cmd.Transaction = tran;
-                        cmd.CommandText = @"insert into BookInfo(WebUrl, Author, Publisher, PublishDate, 
+                        cmd.CommandText = @"insert into BookInfo(WebUrl, BookName, Author, Publisher, PublishDate, 
                                                 PageNum, Price, ISBN, AverageScore, RatingNum,
                                                 FiveStar, FourStar, ThreeStar, TwoStar, OneStar, 
                                                 Tags, ContentDescription, AuthorDescription) 
-                                                values(@WebUrl, @Author, @Publisher, @PublishDate, 
+                                                values(@WebUrl, @BookName, @Author, @Publisher, @PublishDate, 
                                                 @PageNum, @Price, @ISBN, @AverageScore, @RatingNum,
                                                 @FiveStar, @FourStar, @ThreeStar, @TwoStar, @OneStar, 
                                                 @Tags, @ContentDescription, @AuthorDescription)";
 
                         cmd.Parameters.AddRange(new[] {
 								new SQLiteParameter("@WebUrl", cache._WebUrl),
+                                new SQLiteParameter("@BookName", cache._BookName),
                                 new SQLiteParameter("@Author", cache._Author),
                                 new SQLiteParameter("@Publisher", cache._Publish),
                                 new SQLiteParameter("@PublishDate", cache._PublishTime),
@@ -203,7 +204,7 @@ namespace PageExtractor
                     {
                         SQLiteCommand cmd = new SQLiteCommand(conn);
                         cmd.Transaction = tran;
-                        cmd.CommandText = @"update BookInfo set Author = @Author, Publisher = @Publisher, 
+                        cmd.CommandText = @"update BookInfo set BookName = @BookName, Author = @Author, Publisher = @Publisher, 
                                                 PublishDate= @PublishDate, PageNum = @PageNum, Price = @Price,
                                                 ISBN= @ISBN, AverageScore = @AverageScore, RatingNum = @RatingNum,
                                                 FiveStar = @FiveStar, FourStar = @FourStar, ThreeStar = @ThreeStar,
@@ -213,6 +214,7 @@ namespace PageExtractor
 
                         cmd.Parameters.AddRange(new[] {
 								new SQLiteParameter("@WebUrl", cache._WebUrl),
+                                new SQLiteParameter("@BookName", cache._BookName),
                                 new SQLiteParameter("@Author", cache._Author),
                                 new SQLiteParameter("@Publisher", cache._Publish),
                                 new SQLiteParameter("@PublishDate", cache._PublishTime),
@@ -280,6 +282,7 @@ namespace PageExtractor
                 cmd.CommandText = @"CREATE TABLE IF NOT EXISTS [BookInfo] (
                                           [BookID] integer primary key AutoIncrement,
                                           [WebUrl] NVARCHAR(200) UNIQUE, 
+                                          [BookName] NVARCHAR(50),
                                           [Author] NVARCHAR(200),
                                           [Publisher] NVARCHAR(200), 
                                           [PublishDate] NVARCHAR(50),
