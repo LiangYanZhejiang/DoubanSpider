@@ -194,9 +194,9 @@ namespace PageExtractor
         private string _rootUrl = null;
         private string _baseUrl = null;
         private Dictionary<string, UrlType> _urlsLoaded = new Dictionary<string, UrlType>();
-        private Dictionary<string, UrlType> _urlsUnload = new Dictionary<string, UrlType>();
+        private Dictionary<string, UrlType> _urlsUnloadTags = new Dictionary<string, UrlType>();
         /*bool url, need load first*/
-        private Dictionary<string, UrlType> _urlsUnload2 = new Dictionary<string, UrlType>();
+        private Dictionary<string, UrlType> _urlsUnloadBooks = new Dictionary<string, UrlType>();
         private static db_mgr _dbm;
 
         private bool _stop = true;
@@ -374,11 +374,11 @@ namespace PageExtractor
         {
             _dbm = new db_mgr(cmd_opts._db_path, cmd_opts._db_cache);
             _urlsLoaded.Clear();
-            _urlsUnload.Clear();
-            _urlsUnload2.Clear();
-            _dbm.Init_loaddb(_urlsLoaded, _urlsUnload, _urlsUnload2);
+            _urlsUnloadTags.Clear();
+            _urlsUnloadBooks.Clear();
+            _dbm.Init_loaddb(_urlsLoaded, _urlsUnloadTags, _urlsUnloadBooks);
             _log.Debug("Init: _urlsLoaded.Count = {0}, tagunload.Count = {1}, book unload.Count = {2}.",
-                       _urlsLoaded.Count, _urlsUnload.Count, _urlsUnload2.Count);
+                       _urlsLoaded.Count, _urlsUnloadTags.Count, _urlsUnloadBooks.Count);
             _reqsBusy = new bool[_reqCount];
             _workingSignals = new WorkingUnitCollection(_reqCount);
             _stop = false;
@@ -398,24 +398,24 @@ namespace PageExtractor
                 if (_reqsBusy[index])
                     return null;
 
-                if (_urlsUnload2.Count <= 0 && _urlsUnload.Count <= 0)
+                if (_urlsUnloadBooks.Count <= 0 && _urlsUnloadTags.Count <= 0)
                 {
                     _workingSignals.FinishWorking(index);
                     return null;
                 }
                 _reqsBusy[index] = true;
                 _workingSignals.StartWorking(index);
-                if (_urlsUnload2.Count > 0)
+                if (_urlsUnloadBooks.Count > 0)
                 {
-                    urltype = _urlsUnload2.First().Value;
-                    url = _urlsUnload2.First().Key;
-                    _urlsUnload2.Remove(url);
+                    urltype = _urlsUnloadBooks.First().Value;
+                    url = _urlsUnloadBooks.First().Key;
+                    _urlsUnloadBooks.Remove(url);
                 }
                 else
                 {
-                    urltype = _urlsUnload.First().Value;
-                    url = _urlsUnload.First().Key;
-                    _urlsUnload.Remove(url);
+                    urltype = _urlsUnloadTags.First().Value;
+                    url = _urlsUnloadTags.First().Key;
+                    _urlsUnloadTags.Remove(url);
                 }
                 _urlsLoaded.Add(url, urltype);
 
@@ -788,12 +788,27 @@ namespace PageExtractor
             {
                 if (childnode.InnerText.Contains("作者:"))
                 {
-                    bookInfo._Author = childnode.InnerText.Replace("作者:", "").Replace("\n", "").Replace(" ", "");
+                    if (childnode.HasChildNodes)
+                    {
+                        XmlNodeList childAuthorList = childnode.ChildNodes;
+                        foreach (XmlNode childAuthornode in childAuthorList)
+                        {
+                            if (childAuthornode.Name.Equals("a"))
+                            {
+                                if (bookInfo._Author == null)
+                                    bookInfo._Author = childAuthornode.InnerText.Trim();
+                                else
+                                    bookInfo._Author = string.Format(@"{0}\{1}", bookInfo._Author, childAuthornode.InnerText.Trim());
+                            }
+                        }
+                    }
+                    else
+                        bookInfo._Author = childnode.InnerText.Replace("作者:", "").Replace("\n", "").Trim();
                 }
 
                 if (childnode.InnerText.Contains("译者:"))
                 {
-                    bookInfo._Translator = childnode.InnerText.Replace("译者:", "").Replace("\n", "").Replace(" ", "");
+                    bookInfo._Translator = childnode.InnerText.Replace("译者:", "").Replace("\n", "").Trim();
                 }
 
                 if (isPublish)
@@ -930,12 +945,12 @@ namespace PageExtractor
                         continue;
                     }
 
-                    if (node.InnerText.Contains("内容简介"))
+                    if (node.InnerText.Equals("内容简介"))
                     {
                         isContent = true;
                     }
 
-                    if (node.InnerText.Contains("作者简介"))
+                    if (node.InnerText.Equals("作者简介"))
                         isAuthorInfo = true;
 
                 }
@@ -950,12 +965,12 @@ namespace PageExtractor
                 else
                     tag = tagNode.InnerText;
 
-                string strHref = tagNode.Attributes["href"].Value;
+                /*string strHref = tagNode.Attributes["href"].Value;
                 if (strHref != null)
                 {
                     string link = strHref.Contains(_baseUrl) ? strHref : RootUrl + strHref;
                     AddUrls(link, UrlType.BooksUrl);
-                }
+                }*/
             }
 
             bookInfo._tags = tag;
@@ -999,8 +1014,8 @@ namespace PageExtractor
 
         private bool UrlExists(string url)
         {
-            bool result = _urlsUnload.ContainsKey(url);
-            result |= _urlsUnload2.ContainsKey(url);
+            bool result = _urlsUnloadTags.ContainsKey(url);
+            result |= _urlsUnloadBooks.ContainsKey(url);
             result |= _urlsLoaded.ContainsKey(url);
             return result;
         }
@@ -1041,9 +1056,9 @@ namespace PageExtractor
                 if (cleanUrl.Contains("book.douban.com/tag") || cleanUrl.Contains("book.douban.com/subject"))
                 {
                     if (urlType == UrlType.OneBookUrl)
-                        _urlsUnload2.Add(cleanUrl, urlType);
+                        _urlsUnloadBooks.Add(cleanUrl, urlType);
                     else
-                        _urlsUnload.Add(cleanUrl, urlType);
+                        _urlsUnloadTags.Add(cleanUrl, urlType);
                     UrlInfo urlInfo = new UrlInfo(cleanUrl, urlType);
                     _dbm.write_to_db(urlInfo);
                 }
