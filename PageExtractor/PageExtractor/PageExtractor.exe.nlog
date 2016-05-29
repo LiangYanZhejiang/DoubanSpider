@@ -1,0 +1,10 @@
+<nlog xmlns="http://www.nlog-project.org/schemas/NLog.xsd" 
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"> 
+  <targets>
+    <target name="file" xsi:type="File" fileName="E:\Documents\Log\PageExtractor\${shortdate}.txt" 
+            layout="[ThreadId ${threadid}] ${date:format=HH\:mm\:ss.fff} ${level} ${logger:shortName=true:padding=25}: ${message}"/> 
+  </targets> 
+  <rules> 
+    <logger name="*" minlevel="Trace" writeTo="file"/> 
+  </rules> 
+</nlog> 
