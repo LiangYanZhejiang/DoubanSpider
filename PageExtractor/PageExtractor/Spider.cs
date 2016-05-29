@@ -77,7 +77,7 @@ namespace PageExtractor
             private const int BUFFER_SIZE = 131072;
             private byte[] _data = new byte[BUFFER_SIZE];
             private StringBuilder _sb = new StringBuilder();
-            
+
             public HttpWebRequest Req { get; private set; }
             public string Url { get; private set; }
             public UrlType WebUrlType { get; private set; }
@@ -90,7 +90,7 @@ namespace PageExtractor
                     return _sb;
                 }
             }
-            
+
             public byte[] Data
             {
                 get
@@ -266,7 +266,7 @@ namespace PageExtractor
                 }
             }
         }
-         
+
         /// <summary>
         /// 下载最大连接数
         /// </summary>
@@ -384,50 +384,61 @@ namespace PageExtractor
             _stop = false;
         }
 
-        private void RequestResource(int index)
+        private Tuple<string, UrlType> GetUrlAndType(int index)
         {
             if (_stop)
             {
-                return;
+                return null;
             }
 
             UrlType urltype;
             string url = "";
+            lock (_locker)
+            {
+                if (_reqsBusy[index])
+                    return null;
+
+                if (_urlsUnload2.Count <= 0 && _urlsUnload.Count <= 0)
+                {
+                    _workingSignals.FinishWorking(index);
+                    return null;
+                }
+                _reqsBusy[index] = true;
+                _workingSignals.StartWorking(index);
+                if (_urlsUnload2.Count > 0)
+                {
+                    urltype = _urlsUnload2.First().Value;
+                    url = _urlsUnload2.First().Key;
+                    _urlsUnload2.Remove(url);
+                }
+                else
+                {
+                    urltype = _urlsUnload.First().Value;
+                    url = _urlsUnload.First().Key;
+                    _urlsUnload.Remove(url);
+                }
+                _urlsLoaded.Add(url, urltype);
+
+            }
+            return new Tuple<string, UrlType>(url, urltype);
+        }
+
+        private void RequestResource(int index)
+        {
+            var urlAndType = GetUrlAndType(index);
+            if (urlAndType == null)
+                return;
+
+            string url = urlAndType.Item1;
+            UrlType urltype = urlAndType.Item2;
             try
             {
-                lock (_locker)
-                {
-                    if (_reqsBusy[index])
-                        return;
-
-                    if (_urlsUnload2.Count <= 0 && _urlsUnload.Count <= 0)
-                    {
-                        _workingSignals.FinishWorking(index);
-                        return;
-                    }
-                    _reqsBusy[index] = true;
-                    _workingSignals.StartWorking(index);
-                    if (_urlsUnload2.Count > 0)
-                    {
-                        urltype = _urlsUnload2.First().Value;
-                        url = _urlsUnload2.First().Key;
-                        _urlsUnload2.Remove(url);
-                    }
-                    else
-                    {
-                        urltype = _urlsUnload.First().Value;
-                        url = _urlsUnload.First().Key;
-                        _urlsUnload.Remove(url);
-                    }
-                    _urlsLoaded.Add(url, urltype);
-                    
-                }
-
-                _log.Info("Request {0} Time:{1}.", url, DateTime.Now.ToString()); 
+                _log.Info("Request {0} Time:{1}.", url, DateTime.Now.ToString());
 
                 HttpWebRequest req = (HttpWebRequest)WebRequest.Create(url);
                 req.Method = _method; //请求方法
                 req.Accept = _accept; //接受的内容
+                req.CookieContainer = GetCookie();
                 req.UserAgent = _userAgent; //用户代理
                 RequestState rs = new RequestState(req, url, urltype, index);
                 var result = req.BeginGetResponse(new AsyncCallback(ReceivedResource), rs);
@@ -438,7 +449,7 @@ namespace PageExtractor
             {
                 _log.Error("RequestResource: url={0}，HttpStatus={1}, Exception:{2}.", url, we.Status, we.Message);
                 _log.Error(we.StackTrace);
- 
+
                 UrlInfo urlInfo = new UrlInfo(url, we.Status.ToString());
                 _dbm.write_to_db(urlInfo);
 
@@ -447,6 +458,13 @@ namespace PageExtractor
 
             if (!_reqsBusy[index])
                 RequestResource(index);
+        }
+
+        private CookieContainer GetCookie()
+        {
+            CookieContainer _cookie = new CookieContainer();
+            _cookie.Add(new Cookie("bid", Utility.GetPseudoBIDString(), "/", ".douban.com"));
+            return _cookie;
         }
 
         private void ReceivedResource(IAsyncResult ar)
@@ -468,7 +486,7 @@ namespace PageExtractor
                     Stream resStream = res.GetResponseStream();
                     rs.ResStream = resStream;
                     var result = resStream.BeginRead(rs.Data, 0, rs.BufferSize,
-                        new AsyncCallback(ReceivedData), rs);                    
+                        new AsyncCallback(ReceivedData), rs);
                 }
                 else
                 {
@@ -480,7 +498,7 @@ namespace PageExtractor
             catch (WebException we)
             {
                 _log.Error("ReceivedResource: url = {0}, HttpStatus = {1}, Exception:{2}.", url, we.Status, we.Message);
-                _log.Error(we.StackTrace); 
+                _log.Error(we.StackTrace);
                 UrlInfo urlInfo = new UrlInfo(url, we.Status.ToString());
                 _dbm.write_to_db(urlInfo);
 
@@ -549,21 +567,21 @@ namespace PageExtractor
                 StringWriter sw = new StringWriter();
                 XmlTextWriter writer = new XmlTextWriter(sw);
                 writer.Formatting = Formatting.Indented;
-                while(sgmlRreader.Read())
+                while (sgmlRreader.Read())
                 {
-                    if(sgmlRreader.NodeType != XmlNodeType.Whitespace)
+                    if (sgmlRreader.NodeType != XmlNodeType.Whitespace)
                     {
                         writer.WriteNode(sgmlRreader, true);
                     }
                 }
 
                 SaveContents(sw.ToString(), url, urltype);
-                HttpStatus = WebExceptionStatus.Success.ToString();                 
+                HttpStatus = WebExceptionStatus.Success.ToString();
             }
             catch (WebException we)
             {
                 _log.Error("ReceivedData: url = {0}, HttpStatus = {1}, Exception:{2}.", url, we.Status, we.Message);
-                _log.Error(we.StackTrace); 
+                _log.Error(we.StackTrace);
 
                 HttpStatus = we.Status.ToString();
             }
@@ -572,7 +590,7 @@ namespace PageExtractor
                 _log.Error("ReceivedData: url = {0}, Exception:{1}.", url, e.Message);
                 _log.Error(e.StackTrace);
 
-                HttpStatus = e.Message;                
+                HttpStatus = e.Message;
             }
 
             UrlInfo urlInfo = new UrlInfo(url, HttpStatus);
@@ -672,7 +690,7 @@ namespace PageExtractor
             document.LoadXml(xml);
             XmlElement root = document.DocumentElement;
 
-            switch(urlType)
+            switch (urlType)
             {
                 case UrlType.TagsUrl:
                     {
@@ -692,7 +710,7 @@ namespace PageExtractor
                         }
                         break;
                     }
-                    
+
                 case UrlType.BooksUrl:
                     {
                         XmlNodeList nodeList = root.SelectNodes("//a[@title]");
@@ -766,7 +784,7 @@ namespace PageExtractor
             bool isPageNum = false;
             bool isPrice = false;
             bool isISBN = false;
-            foreach(XmlNode childnode in childnodeList)
+            foreach (XmlNode childnode in childnodeList)
             {
                 if (childnode.InnerText.Contains("作者:"))
                 {
@@ -850,8 +868,8 @@ namespace PageExtractor
                 return;
 
             if (!decimal.TryParse(nodeList[0].InnerText, out bookInfo._AverageScore))
-                return;                
-  
+                return;
+
             nodeList = root.SelectNodes("//span[@property='v:votes']");
             if (nodeList.Count < 1)
                 return;
@@ -869,16 +887,16 @@ namespace PageExtractor
 
                 decimal dStar;
                 if (decimal.TryParse(star, out dStar))
-                  bookInfo._star[starNum] = dStar / 100;
+                    bookInfo._star[starNum] = dStar / 100;
                 starNum++;
             }
-                
+
             bool isContent = false;
             bool isAuthorInfo = false;
             nodeList = root.SelectNodes("//div[@class='related_info']");
             if (nodeList.Count > 0)
             {
-                nodeList = nodeList[0].HasChildNodes ? nodeList[0].ChildNodes: null;
+                nodeList = nodeList[0].HasChildNodes ? nodeList[0].ChildNodes : null;
 
                 foreach (XmlNode spanNode in nodeList)
                 {
@@ -897,7 +915,7 @@ namespace PageExtractor
                                 node = node.NextSibling;
 
                             bookInfo._Content = node.FirstChild.LastChild.InnerText;
-                        }                            
+                        }
                         isContent = false;
                         continue;
                     }
@@ -918,7 +936,7 @@ namespace PageExtractor
                     }
 
                     if (node.InnerText.Contains("作者简介"))
-                        isAuthorInfo = true;                    
+                        isAuthorInfo = true;
 
                 }
             }
@@ -941,8 +959,8 @@ namespace PageExtractor
             }
 
             bookInfo._tags = tag;
-            _dbm.write_to_db(bookInfo);              
-         }
+            _dbm.write_to_db(bookInfo);
+        }
 
         private void TimeoutCallback(object state, bool timedOut)
         {
@@ -961,7 +979,7 @@ namespace PageExtractor
                     _reqsBusy[rs.Index] = false;
                     RequestResource(rs.Index);
                 }
-                
+
             }
         }
 
@@ -1000,7 +1018,7 @@ namespace PageExtractor
             {
                 return false;
             }
-            
+
             return true;
         }
 
@@ -1010,7 +1028,7 @@ namespace PageExtractor
             {
                 return;
             }
-                 
+
             string cleanUrl = url.Trim();
             int end = cleanUrl.IndexOf(' ');
             if (end > 0)

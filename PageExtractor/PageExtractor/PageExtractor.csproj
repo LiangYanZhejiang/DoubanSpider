@@ -74,6 +74,7 @@
       <DependentUpon>PropertyWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="Spider.cs" />
+    <Compile Include="Utility.cs" />
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
